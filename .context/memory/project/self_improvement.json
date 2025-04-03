@@ -1,0 +1,57 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "last_updated": "2025-03-15T14:58:00"
+  },
+  "insights": {
+    "process": [],
+    "efficiency": [],
+    "patterns": [],
+    "blockers": []
+  },
+  "metrics": {
+    "time_allocation": {
+      "categories": {
+        "implementation": 0,
+        "planning": 0,
+        "documentation": 0,
+        "debugging": 0,
+        "other": 0
+      },
+      "history": []
+    },
+    "task_completion": {
+      "average_completion_time": {
+        "high_priority": 0,
+        "medium_priority": 0,
+        "low_priority": 0
+      },
+      "completion_rate": 0,
+      "history": []
+    },
+    "decision_metrics": {
+      "average_decisions_per_session": 0,
+      "decision_categories": {
+        "architecture": 0,
+        "implementation": 0,
+        "process": 0
+      }
+    }
+  },
+  "patterns": {
+    "task_patterns": {
+      "duration": [],
+      "dependencies": []
+    },
+    "decision_patterns": [],
+    "session_patterns": []
+  },
+  "recommendations": {
+    "process_improvements": [],
+    "efficiency_improvements": [],
+    "risk_mitigations": []
+  },
+  "history": {
+    "analysis_history": []
+  }
+}
