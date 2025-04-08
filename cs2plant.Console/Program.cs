@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using cs2plant.Services;
+using cs2plant.Core.Services;
 
 var builder = Host.CreateApplicationBuilder(args);
 

@@ -1,16 +1,10 @@
-using Microsoft.Build.Construction;
-using Microsoft.Build.Evaluation;
 using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
-using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using Project = Microsoft.CodeAnalysis.Project;
-using System.Text.RegularExpressions;
-using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
 
-namespace cs2plant.Services;
+namespace cs2plant.Core.Services;
 
 /// <summary>
 /// Handles loading and initialization of MSBuild projects.
@@ -18,6 +12,7 @@ namespace cs2plant.Services;
 public class MSBuildProjectLoader
 {
     private readonly ILogger<MSBuildProjectLoader> _logger;
+    private readonly SolutionParser _solutionParser;
     private static readonly Dictionary<string, string> _globalProperties = new()
     {
         { "DesignTimeBuild", "true" },
@@ -33,13 +28,10 @@ public class MSBuildProjectLoader
     private static bool _initialized;
     private static readonly object _lock = new();
 
-    private static readonly Regex _projectRegex = new(
-        @"Project\(""\{[^}]+\}""\)\s*=\s*""([^""]+)""\s*,\s*""([^""]+)""\s*,\s*""\{[^}]+\}""",
-        RegexOptions.Compiled | RegexOptions.Multiline);
-
-    public MSBuildProjectLoader(ILogger<MSBuildProjectLoader> logger)
+    public MSBuildProjectLoader(ILogger<MSBuildProjectLoader> logger, SolutionParser solutionParser)
     {
         _logger = logger;
+        _solutionParser = solutionParser;
         InitializeMSBuild();
     }
 
@@ -74,20 +66,36 @@ public class MSBuildProjectLoader
     {
         try
         {
-            var workspace = MSBuildWorkspace.Create(_globalProperties);
-            workspace.WorkspaceFailed += (sender, args) =>
-            {
-                _logger.LogWarning("Workspace warning: {Message}", args.Diagnostic.Message);
-            };
-
-            var project = workspace.OpenProjectAsync(projectPath, cancellationToken: cancellationToken).Result;
-            return project;
+            var workspace = CreateWorkspace();
+            return LoadProjectInWorkspace(workspace, projectPath, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to load project: {ProjectPath}", projectPath);
+            LogProjectLoadError(ex, projectPath);
             return null;
         }
+    }
+
+    private MSBuildWorkspace CreateWorkspace()
+    {
+        var workspace = MSBuildWorkspace.Create(_globalProperties);
+        workspace.WorkspaceFailed += HandleWorkspaceFailure;
+        return workspace;
+    }
+
+    private void HandleWorkspaceFailure(object? sender, WorkspaceDiagnosticEventArgs args)
+    {
+        _logger.LogWarning("Workspace warning: {Message}", args.Diagnostic.Message);
+    }
+
+    private Project LoadProjectInWorkspace(MSBuildWorkspace workspace, string projectPath, CancellationToken cancellationToken)
+    {
+        return workspace.OpenProjectAsync(projectPath, cancellationToken: cancellationToken).Result;
+    }
+
+    private void LogProjectLoadError(Exception ex, string projectPath)
+    {
+        _logger.LogError(ex, "Failed to load project: {ProjectPath}", projectPath);
     }
 
     /// <summary>
@@ -97,43 +105,6 @@ public class MSBuildProjectLoader
     /// <returns>A list of projects in the solution.</returns>
     public IEnumerable<string> GetProjectsFromSolution(string solutionPath)
     {
-        List<string> projects = new();
-
-        try
-        {
-            var fullSolutionPath = Path.GetFullPath(solutionPath);
-            var solutionDirectory = Path.GetDirectoryName(fullSolutionPath) ?? string.Empty;
-            var solutionContent = File.ReadAllText(fullSolutionPath);
-            var matches = _projectRegex.Matches(solutionContent);
-
-            foreach (Match match in matches)
-            {
-                if (match.Groups.Count < 3)
-                {
-                    continue;
-                }
-
-                var projectName = match.Groups[1].Value;
-                var relativePath = match.Groups[2].Value.Replace('\\', Path.DirectorySeparatorChar);
-                var fullPath = Path.GetFullPath(Path.Combine(solutionDirectory, relativePath));
-
-                if (File.Exists(fullPath) && Path.GetExtension(fullPath).Equals(".csproj", StringComparison.OrdinalIgnoreCase))
-                {
-                    _logger.LogInformation("Found project: {ProjectName} at {ProjectPath}", projectName, fullPath);
-                    projects.Add(fullPath);
-                }
-                else
-                {
-                    _logger.LogWarning("Project file not found or not a .csproj: {ProjectPath}", fullPath);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to get projects from solution: {SolutionPath}", solutionPath);
-            return Enumerable.Empty<string>();
-        }
-
-        return projects;
+        return _solutionParser.GetProjectPaths(solutionPath);
     }
-} 
+}

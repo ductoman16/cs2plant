@@ -1,7 +1,7 @@
 ---
 title: Implement Basic Class Diagram Generation
 type: task
-status: planned
+status: active
 created: 2025-03-05T12:41:19
 updated: 2025-03-05T12:41:19
 id: TASK-001

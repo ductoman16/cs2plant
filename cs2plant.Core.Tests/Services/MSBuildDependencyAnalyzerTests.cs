@@ -1,9 +1,9 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using cs2plant.Services;
-using Xunit;
+using cs2plant.Core.Services;
 
-namespace cs2plant.Tests.Services;
+namespace cs2plant.Core.Tests.Services;
 
 public sealed class MSBuildDependencyAnalyzerTests : IDisposable
 {
@@ -13,10 +13,15 @@ public sealed class MSBuildDependencyAnalyzerTests : IDisposable
     private readonly MSBuildDependencyAnalyzer _analyzer;
     private readonly string _tempSolutionPath;
     private readonly string _tempProjectPath;
+    private readonly SolutionParser _solutionParser;
 
     public MSBuildDependencyAnalyzerTests()
     {
-        _projectLoader = new MSBuildProjectLoader(LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<MSBuildProjectLoader>());
+        _solutionParser = new SolutionParser(LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<SolutionParser>());
+        _projectLoader = new MSBuildProjectLoader(
+            LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<MSBuildProjectLoader>(),
+            _solutionParser
+        );
         _classAnalyzer = new ClassAnalyzer(LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<ClassAnalyzer>());
         _analyzer = new MSBuildDependencyAnalyzer(_projectLoader, _logger, _classAnalyzer);
 

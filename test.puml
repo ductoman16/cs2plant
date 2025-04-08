@@ -1,0 +1,48 @@
+@startuml
+left to right direction
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+skinparam component {
+  BackgroundColor White
+  ArrowColor Black
+  BorderColor Black
+}
+skinparam class {
+  BackgroundColor White
+  ArrowColor Black
+  BorderColor Black
+}
+skinparam package {
+  BackgroundColor LightGray
+  BorderColor Black
+}
+
+component "TestProject.Core"
+note bottom of "TestProject.Core"
+  Packages:
+  - Microsoft.Extensions.Logging@8.0.0
+end note
+
+package TestProject.Core {
+  namespace TestProject.Core.Services {
+    interface ITestService {
+    }
+    class TestService <<sealed>> {
+      + Id: int { get init }
+      + Name: string { get set }
+      + ProcessData(data: string): Task<bool>
+    }
+    TestService --|> ITestService
+  }
+}
+
+component "TestProject.Api"
+note bottom of "TestProject.Api"
+  Packages:
+  - Microsoft.AspNetCore.OpenApi@8.0.0
+end note
+
+"TestProject.Api" --> "TestProject.Core"
+
+@enduml

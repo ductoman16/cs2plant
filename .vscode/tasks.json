@@ -1,0 +1,99 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "📦 dotnet build",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/cs2plant.sln",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary",
+                "/warnaserror"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "🧪 dotnet test",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "test",
+                "${workspaceFolder}/cs2plant.sln"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "dotnet test (debug)",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "test",
+                "${workspaceFolder}/cs2plant.sln"
+            ],
+            "options": {
+                "env": {
+                    "VSTEST_HOST_DEBUG": "1"
+                }
+            },
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        },
+        {
+            "type": "dotnet",
+            "task": "clean",
+            "group": "build",
+            "problemMatcher": [],
+            "label": "🫧 dotnet clean"
+        },
+        {
+            "label": "💅 dotnet format",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "format",
+                "${workspaceFolder}/cs2plant.sln"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": "none"
+        },
+        {
+            "label": "🚀 Run Without Debugging (Windows)",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "run",
+                "--project",
+                "${workspaceFolder}/cs2plant.Console/cs2plant.Console.csproj",
+                "--no-build"
+            ],
+            "options": {
+                "env": {
+                    "ASPNETCORE_URLS": "http://localhost:5034",
+                    "ASPNETCORE_ENVIRONMENT": "Development"
+                }
+            },
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "dedicated",
+                "showReuseMessage": false,
+                "clear": true
+            }
+        }
+    ]
+}

@@ -2,169 +2,119 @@ using System.Text;
 using Ardalis.GuardClauses;
 using Microsoft.Extensions.Logging;
 using cs2plant.Models;
+using cs2plant.Services;
+using cs2plant.Core.Services;
 
 namespace cs2plant.Services;
 
 /// <summary>
-/// Generates PlantUML diagrams from project dependencies.
+/// Generates PlantUML diagrams from class information.
 /// </summary>
-public sealed class PlantUmlGenerator(ILogger<PlantUmlGenerator> logger) : IPlantUmlGenerator
+public class PlantUmlGenerator(ILogger<PlantUmlGenerator> logger) : IPlantUmlGenerator
 {
-    private readonly ILogger<PlantUmlGenerator> _logger = Guard.Against.Null(logger);
-
-    /// <inheritdoc />
     public string GenerateDiagram(IEnumerable<ProjectDependency> dependencies)
     {
         Guard.Against.Null(dependencies);
-        var projectList = dependencies.ToList();
-        _logger.LogInformation("Generating PlantUML diagram for {Count} projects", projectList.Count);
-
+        var dependencyList = dependencies.ToList();
+        
+        logger.LogInformation("Generating PlantUML diagram for {Count} projects", dependencyList.Count);
+        
         var sb = new StringBuilder();
-        sb.AppendLine("@startuml");
-        sb.AppendLine("skinparam componentStyle rectangle");
-        sb.AppendLine("skinparam packageStyle rectangle");
-        sb.AppendLine("skinparam classAttributeIconSize 0");
-        sb.AppendLine("skinparam component {");
-        sb.AppendLine("  BackgroundColor White");
-        sb.AppendLine("  ArrowColor Black");
-        sb.AppendLine("  BorderColor Black");
-        sb.AppendLine("}");
-        sb.AppendLine("skinparam class {");
-        sb.AppendLine("  BackgroundColor White");
-        sb.AppendLine("  ArrowColor Black");
-        sb.AppendLine("  BorderColor Black");
-        sb.AppendLine("}");
-        sb.AppendLine("skinparam package {");
-        sb.AppendLine("  BackgroundColor LightGray");
-        sb.AppendLine("  BorderColor Black");
-        sb.AppendLine("}");
-        sb.AppendLine();
+        var context = new PlantUmlGenerationContext(sb, "");
 
-        // Generate project components
-        foreach (var project in projectList)
+        // Generate component diagram
+        GenerateHeader(context);
+        GenerateProjectDependencies(context, dependencyList);
+        context.AppendLine("@enduml");
+
+        // Generate class diagram if there are any classes
+        if (dependencyList.Any(d => d.Classes.Any()))
         {
-            sb.AppendLine($"[{project.ProjectName}]");
-            if (project.PackageReferences.Any())
+            GenerateHeader(context);
+            foreach (var namespaceGroup in dependencyList
+                .SelectMany(d => d.Classes)
+                .GroupBy(c => c.Namespace))
             {
-                sb.AppendLine($"note bottom of [{project.ProjectName}]");
-                sb.AppendLine("  Packages:");
-                foreach (var package in project.PackageReferences)
-                {
-                    sb.AppendLine($"  - {package}");
-                }
-                sb.AppendLine("end note");
+                GenerateNamespace(context, namespaceGroup);
             }
-            sb.AppendLine();
-
-            // Generate class diagrams for each project
-            if (project.Classes.Any())
-            {
-                sb.AppendLine($"package {project.ProjectName} {{");
-                
-                // Group classes by namespace
-                var classesByNamespace = project.Classes
-                    .GroupBy(c => c.Namespace ?? "")
-                    .OrderBy(g => g.Key);
-
-                foreach (var namespaceGroup in classesByNamespace)
-                {
-                    if (!string.IsNullOrEmpty(namespaceGroup.Key))
-                    {
-                        sb.AppendLine($"  namespace {namespaceGroup.Key} {{");
-                    }
-
-                    // First, declare all interfaces
-                    foreach (var classInfo in namespaceGroup.Where(c => c.BaseTypes.Any()))
-                    {
-                        foreach (var iface in classInfo.BaseTypes)
-                        {
-                            sb.AppendLine($"    interface {iface} {{");
-                            sb.AppendLine("    }");
-                        }
-                    }
-
-                    // Then declare all classes
-                    foreach (var classInfo in namespaceGroup)
-                    {
-                        var classModifiers = new List<string>();
-                        if (classInfo.IsSealed)
-                        {
-                            classModifiers.Add("<<sealed>>");
-                        }
-                        if (classInfo.IsRecord)
-                        {
-                            classModifiers.Add("<<record>>");
-                        }
-                        var classModifiersStr = classModifiers.Any() ? $" {string.Join(" ", classModifiers)}" : "";
-                        
-                        sb.AppendLine($"    class {classInfo.Name}{classModifiersStr} {{");
-                        
-                        // Properties
-                        foreach (var property in classInfo.Properties)
-                        {
-                            var propertyAccessors = new List<string>();
-                            if (property.HasGet)
-                            {
-                                propertyAccessors.Add("get");
-                            }
-                            if (property.HasSet)
-                            {
-                                propertyAccessors.Add("set");
-                            }
-                            if (property.HasInit)
-                            {
-                                propertyAccessors.Add("init");
-                            }
-                            var propertyAccessorsStr = propertyAccessors.Any() ? $" {{ {string.Join(" ", propertyAccessors)} }}" : string.Empty;
-                            sb.AppendLine($"      + {property.Name}: {property.Type}{propertyAccessorsStr}");
-                        }
-
-                        // Methods
-                        foreach (var method in classInfo.Methods)
-                        {
-                            var asyncPrefix = method.IsAsync ? "async " : string.Empty;
-                            var parameters = string.Join(", ", method.Parameters.Select(p => $"{p.Name}: {p.Type}"));
-                            sb.AppendLine($"      + {asyncPrefix}{method.Name}({parameters}): {method.ReturnType}");
-                        }
-
-                        sb.AppendLine("    }");
-
-                        // Generate inheritance relationships
-                        foreach (var baseType in classInfo.BaseTypes)
-                        {
-                            sb.AppendLine($"    {baseType} <|.. {classInfo.Name}");
-                        }
-                    }
-
-                    if (!string.IsNullOrEmpty(namespaceGroup.Key))
-                    {
-                        sb.AppendLine("  }");
-                    }
-                }
-                sb.AppendLine("}");
-            }
+            context.AppendLine("@enduml");
         }
-
-        // Generate project dependencies
-        AppendProjectDependencies(sb, projectList);
-
-        sb.AppendLine();
-        sb.AppendLine("@enduml");
 
         return sb.ToString();
     }
 
-    private static string SanitizeProjectName(string projectName) =>
-        projectName.Replace(".", "_").Replace(" ", "_").Replace("-", "_");
-
-    private void AppendProjectDependencies(StringBuilder sb, IReadOnlyList<ProjectDependency> dependencies)
+    internal void GenerateHeader(PlantUmlGenerationContext context)
     {
-        foreach (var dependency in dependencies)
+        context.AppendLine("@startuml");
+        context.AppendLine("skinparam monochrome true");
+        context.AppendLine("skinparam shadowing false");
+        context.AppendLine("skinparam linetype ortho");
+        context.AppendLine("skinparam packageStyle rectangle");
+        context.AppendLine("skinparam classAttributeIconSize 0");
+        context.AppendLine("");
+    }
+
+    internal void GenerateProjectDependencies(PlantUmlGenerationContext context, IEnumerable<ProjectDependency> projects)
+    {
+        context.AppendLine("package \"Project Dependencies\" {");
+        foreach (var project in projects)
         {
-            foreach (var reference in dependency.ProjectReferences)
+            context.AppendLine($"  component \"{project.ProjectName}\"");
+            if (project.PackageReferences.Any())
             {
-                sb.AppendLine($"[{reference}] <-- [{dependency.ProjectName}]");
+                context.AppendLine("  note right");
+                context.AppendLine("  Packages:");
+                foreach (var package in project.PackageReferences)
+                {
+                    context.AppendLine($"    - {package}");
+                }
+                context.AppendLine("  end note");
             }
+        }
+
+        foreach (var project in projects)
+        {
+            foreach (var reference in project.ProjectReferences)
+            {
+                context.AppendLine($"  \"{project.ProjectName}\" --> \"{reference}\"");
+            }
+        }
+        context.AppendLine("}");
+    }
+
+    internal void GenerateNamespace(PlantUmlGenerationContext context, IGrouping<string, ClassInfo> namespaceGroup)
+    {
+        if (!string.IsNullOrEmpty(namespaceGroup.Key))
+        {
+            context.AppendLine($"namespace {namespaceGroup.Key} {{");
+        }
+
+        var namespaceContext = !string.IsNullOrEmpty(namespaceGroup.Key) 
+            ? context.WithIndent("  ")
+            : context;
+
+        // First declare all interfaces
+        var allInterfaces = namespaceGroup
+            .SelectMany(c => c.BaseTypes)
+            .Distinct()
+            .ToList();
+
+        foreach (var iface in allInterfaces)
+        {
+            namespaceContext.AppendLine($"interface {iface} {{");
+            namespaceContext.AppendLine("}");
+        }
+
+        // Then declare all classes
+        var allNestedClasses = namespaceGroup.SelectMany(c => c.NestedClasses).ToHashSet();
+        foreach (var classInfo in namespaceGroup.Where(c => !allNestedClasses.Contains(c)))
+        {
+            namespaceContext.GenerateClassDefinition(classInfo);
+        }
+
+        if (!string.IsNullOrEmpty(namespaceGroup.Key))
+        {
+            context.AppendLine("}");
         }
     }
 } 

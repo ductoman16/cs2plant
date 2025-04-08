@@ -1,8 +1,10 @@
 using FluentAssertions;
 using FluentAssertions.Execution;
 using Microsoft.Extensions.Logging;
-using cs2plant.Services;
 using Xunit;
+using cs2plant.Core.Services;
+using cs2plant.Services;
+using NSubstitute;
 
 namespace cs2plant.Tests.Services;
 
@@ -14,10 +16,12 @@ public sealed class MSBuildProjectLoaderTests : IDisposable
     private readonly string _tempProjectPath;
     private readonly string _tempProject2Path;
     private readonly string _tempProjectInSubdirPath;
+    private readonly SolutionParser _solutionParser;
 
     public MSBuildProjectLoaderTests()
     {
-        _loader = new MSBuildProjectLoader(_logger);
+        _solutionParser = new SolutionParser(LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<SolutionParser>());
+        _loader = new MSBuildProjectLoader(_logger, _solutionParser);
         
         // Create temporary solution and project files
         var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
